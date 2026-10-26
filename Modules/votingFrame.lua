@@ -800,6 +800,22 @@ local function RollText(c, name)
 	return tostring(c.roll) .. (plus > 0 and (" |cffdca77f+" .. plus .. "|r") or "")
 end
 
+--- Display order only: never reorder lootTable, whose indices are the comms/session IDs.
+-- Stable partition keeps both groups in their original order, including duplicate items.
+function BRCVotingFrame:BuildItemRows()
+	local rows, rest = {}, {}
+	for ses, item in ipairs(lootTable) do
+		local row = {ses = ses, item = item}
+		if self.myWinsFirst and item.awarded and item.winner == addon.playerName then
+			rows[#rows + 1] = row
+		else
+			rest[#rest + 1] = row
+		end
+	end
+	for _, row in ipairs(rest) do rows[#rows + 1] = row end
+	return rows
+end
+
 local NUM_W = 38 -- width of the Won / Roll / Votes columns (header and cells)
 
 function BRCVotingFrame:GetFrame()
@@ -820,6 +836,15 @@ function BRCVotingFrame:GetFrame()
 	f.railTitle = UI:Text(f.rail, 11, "ink3")
 	f.railTitle:SetPoint("TOPLEFT", 10, -8)
 	f.railTitle:SetText("ITEMS")
+	f.myWins = UI:Button(f.rail, "My wins first: Off", 186, 22, "default", function()
+		self.myWinsFirst = not self.myWinsFirst
+		f.myWins:SetActive(self.myWinsFirst)
+		f.myWins:SetLabel(self.myWinsFirst and "My wins first: On" or "My wins first: Off")
+		f.items.offset = 0
+		self:Update()
+	end)
+	f.myWins:SetPoint("TOPLEFT", 10, -26)
+	f.myWins.tip = {"My wins first", "Show items awarded to you at the top. Click again for the original order. Only changes your view; resets on reload."}
 	f.items = UI:List(f.rail, 44, function(list)
 		local r = CreateFrame("Button", nil, list)
 		UI:Panel(r, "bg2", false, 1)
@@ -845,7 +870,8 @@ function BRCVotingFrame:GetFrame()
 		r.glow:SetScript("OnUpdate", function(g) g:SetAlpha(0.55 + 0.45 * math.sin(GetTime() * 4)) end)
 		r:SetScript("OnClick", function(self) BRCVotingFrame:SwitchSession(self.ses) end)
 		return r
-	end, function(r, item, i)
+	end, function(r, row)
+		local item, i = row.item, row.ses
 		r.ses = i
 		r.icon:SetItem(item.link)
 		r.name:SetText(item.name or item.link or "?")
@@ -873,7 +899,7 @@ function BRCVotingFrame:GetFrame()
 		local c = (r.ready and not item.awarded and not on) and p.ok or p.accent -- green edge: every answer is in
 		r.mark:SetVertexColor(c[1], c[2], c[3], (on or (r.ready and not item.awarded)) and 1 or 0)
 	end)
-	f.items:SetPoint("TOPLEFT", f.rail, "TOPLEFT", 1, -24)
+	f.items:SetPoint("TOPLEFT", f.rail, "TOPLEFT", 1, -54)
 	f.items:SetPoint("BOTTOMRIGHT", f.rail, "BOTTOMRIGHT", -1, 1)
 
 	-- side panel (selected player)
@@ -1341,7 +1367,7 @@ function BRCVotingFrame:Update()
 	self:LayoutSide()
 	f.empty:Hide()
 	local t = lootTable[session]
-	f.items:SetData(lootTable)
+	f.items:SetData(self:BuildItemRows())
 	local rows = self:BuildRows()
 	if self.selected and not t.candidates[self.selected] then self.selected = nil end
 	-- until the loot master clicks a player, the pick follows the top of the board as answers come in
