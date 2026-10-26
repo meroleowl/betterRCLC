@@ -1,0 +1,18 @@
+<Ui xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns="http://www.blizzard.com/wow/ui/">
+  <Script file = "skin.lua" />
+  <Script file = "kit.lua" />
+  <Script file = "main.lua" />
+  <Script file = "rolls.lua" />
+  <Script file = "pug.lua" />
+  <Script file = "bisLists.lua" />
+  <Script file = "upgrade.lua" />
+  <Script file = "simImport.lua" />
+  <Script file = "lootBags.lua" />
+  <Script file = "lootFrame.lua" />
+  <Script file = "versionCheck.lua" />
+  <Script file = "votingFrame.lua" />
+  <Script file = "sessionFrame.lua" />
+  <Script file = "lootHistory.lua" />
+  <Script file = "raidPanel.lua" />
+  <Script file = "settings.lua" />
+</Ui>
