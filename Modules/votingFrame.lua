@@ -725,10 +725,11 @@ function BRCVotingFrame:Confirm(button, question, fn)
 		return
 	end
 	button.label0 = button.label0 or button.text:GetText()
-	button.confirming = true
+	local confirmation = {} -- each attempt owns its timeout
+	button.confirming = confirmation
 	button:SetLabel(question)
 	self:ScheduleTimer(function()
-		if button.confirming then button.confirming = nil button:SetLabel(button.label0) end
+		if button.confirming == confirmation then button.confirming = nil button:SetLabel(button.label0) end
 	end, 4)
 end
 
@@ -1208,15 +1209,17 @@ function BRCVotingFrame:BuildSide(s)
 	s.awardTitle = UI:Text(s, 11, "ink3")
 	s.awardTitle:SetPoint("BOTTOMLEFT", 12, 72)
 	s.awardTitle:SetText("Award as")
-	s.awardAs = UI:Segmented(s, AWARD_AS, function(k) self.awardAs = k end, 22, 54)
+	s.awardAs = UI:Segmented(s, AWARD_AS, function(k) self.awardAs = k self:UpdateSide() end, 22, 54)
 	for _, b in ipairs(s.awardAs.buttons) do if type(b.key) == "number" then b:SetTextTint(addon:AnswerColor(b.key)) end end
 	s.awardAs:SetPoint("BOTTOMLEFT", 12, 44)
 	-- accent outline (not filled) so the winner's name can be in class colour and stay readable
 	s.award = UI:Button(s, "Award", 222, 26, "default", function(b)
-		local name, as = self.selected, self.awardAs
-		if not name then return end
+		self:UpdateSide() -- validate again in case the action changed between clicks
+		local context = b.awardContext
+		if not context or not context.mode then return end
+		local name, as = context.name, context.reason
 		local cand = lootTable[session] and lootTable[session].candidates[name]
-		if lootTable[session].awarded then -- already awarded, still in my bags: move it
+		if context.mode == "move" then -- already awarded, still in my bags: move it
 			return self:Confirm(b, "Confirm: move to " .. UI:ClassName(name, cand and cand.class) .. "?", function() self:Reaward(name) end)
 		end
 		self:Confirm(b, "Confirm: award to " .. UI:ClassName(name, cand and cand.class) .. "?", function()
@@ -1256,6 +1259,29 @@ function BRCVotingFrame:RetryFailed(viaMe)
 	self:Update()
 end
 
+--- Keep the two-click action tied to the exact item, recipient and award choice.
+-- Ordinary redraws must not cancel it; a different action must never inherit it.
+function BRCVotingFrame:SyncAwardButton(canAward, canMove)
+	local b = self.frame.side.award
+	local item = lootTable[session]
+	local mode = canAward and "award" or canMove and "move" or nil
+	local name = mode and self.selected or nil
+	local reason = canAward and self.awardAs or nil
+	local old = b.awardContext
+	if not mode or not old or old.item ~= item or old.session ~= session
+		or old.link ~= item.link or old.sid ~= item.sid or old.winner ~= item.winner
+		or old.name ~= name or old.reason ~= reason or old.mode ~= mode then
+		b.confirming, b.label0 = nil, nil
+		b.awardContext = {item = item, session = session, link = item.link, sid = item.sid,
+			winner = item.winner, name = name, reason = reason, mode = mode}
+	end
+	if mode and not b.confirming then
+		local c = item.candidates[name]
+		b:SetActive(true)
+		b:SetLabel((mode == "move" and "Move award to " or "Award to ") .. UI:ClassName(name, c and c.class))
+	end
+end
+
 function BRCVotingFrame:UpdateSide()
 	local s = self.frame.side
 	local p = lootTable[session].awardFailed
@@ -1278,6 +1304,12 @@ function BRCVotingFrame:UpdateSide()
 	local canMove = show and addon.isMasterLooter and active and lootTable[session].awarded and self.selected ~= lootTable[session].winner
 		and self:BagEntry(session) ~= nil
 	if canAward then s.awardAs:Show() s.award:Show() elseif canMove then s.awardAs:Hide() s.award:Show() else s.awardAs:Hide() s.award:Hide() end
+	if canAward then
+		local key = (type(c.response) == "number" and c.response <= 3) and c.response or 1
+		if self.awardFor ~= self.selected then self.awardFor, self.awardAs = self.selected, key end
+		s.awardAs:Select(self.awardAs)
+	end
+	self:SyncAwardButton(canAward, canMove)
 	if not show and not failed and self.nobody and addon.isMasterLooter and active and not lootTable[session].awarded then
 		s.toDE:Show()
 		if not s.toDE.confirming then s.toDE:SetLabel((db.disenchanter or "") ~= "" and ("Send to " .. db.disenchanter) or "Pick a disenchanter") end
@@ -1342,21 +1374,6 @@ function BRCVotingFrame:UpdateSide()
 		local w = wins[#wins - i + 1]
 		local tex = w and w.link and select(10, GetItemInfo(w.link))
 		s.last[i]:SetText(w and ((tex and ("|T" .. tex .. ":16:16:0:0:64:64:5:59:5:59|t ") or "") .. (w.link or "?") .. " |cff6f6a62" .. (w.date or "") .. "|r") or (i == 1 and "none in 7 days" or ""))
-	end
-	if canMove then
-		s.award:SetActive(true)
-		s.award:SetLabel("Move award to " .. UI:ClassName(name, c.class))
-		s.award.label0 = nil
-		s.award.confirming = nil
-	end
-	if canAward then
-		local key = (type(c.response) == "number" and c.response <= 3) and c.response or 1
-		if self.awardFor ~= name then self.awardFor, self.awardAs = name, key end
-		s.awardAs:Select(self.awardAs)
-		s.award:SetActive(true)
-		s.award:SetLabel("Award to " .. UI:ClassName(name, c.class))
-		s.award.label0 = nil
-		s.award.confirming = nil
 	end
 end
 
@@ -1457,6 +1474,7 @@ end
 function BRCVotingFrame:SwitchSession(s)
 	if not lootTable[s] then return end
 	session = s
+	self.frame.side.award.confirming, self.frame.side.award.label0 = nil, nil
 	self.selected, self.awardFor = nil, nil -- Award as starts from the player's answer again on every item
 	self.frame.rows.offset = 0
 	self:Update()

@@ -76,8 +76,14 @@ local function FindInBags(id, used)
 	end
 end
 
+--- Pause automation, not manual trading or completed-trade bookkeeping.
+local function CouncilRunning()
+	local ml = addon:GetActiveModule("masterlooter")
+	return addon.isMasterLooter and ml and ml.running
+end
+
 local function FillTrade()
-	if not tradeTarget or CursorHasItem() then return end
+	if CouncilRunning() or not tradeTarget or CursorHasItem() then return end
 	local used, n, put = {}, 1, 0
 	for _, t in ipairs(addon:ToTrade()) do
 		if addon:UnitIsUnit(t.winner, tradeTarget) then
@@ -115,7 +121,7 @@ end
 --- One pass; returns the name it asked, if any.
 function addon:AutoTradeStep()
 	local p = self.db and self.db.profile
-	if not (p and p.autoTrade and self.isMasterLooter) or (TradeFrame and TradeFrame:IsShown()) or UnitIsDeadOrGhost("player") then
+	if not (p and p.autoTrade and self.isMasterLooter) or CouncilRunning() or (TradeFrame and TradeFrame:IsShown()) or UnitIsDeadOrGhost("player") then
 		wipe(near)
 		return
 	end
