@@ -222,9 +222,21 @@ end
 
 function betterRCLCML:AddUserItem(item)
 	if self.running then return addon:Print(L["You're already running a session."]) end
-	self:AddItem(item, true)
+	if not item or (type(item) == "string" and not item:find("%S")) then
+		return addon:Print("Usage: /brc add <item ID or link>")
+	end
+	local usage = addon:Getdb().usage
+	if usage.never or not usage.ml then
+		return addon:Print("Enable Loot council in Settings > General > Use as loot master first.")
+	end
+	-- Initialize only when Loot council is enabled in the settings.
+	if not self:IsEnabled() then
+		addon:CallModule("masterlooter")
+		self:NewML(addon.masterLooter)
+	end
 	addon:CallModule("sessionframe")
-	addon:GetActiveModule("sessionframe"):Show(self.lootTable)
+	local queue = addon:GetActiveModule("sessionframe")
+	if queue:AddManual(tostring(item)) then queue:Show() end
 end
 
 function betterRCLCML:SessionFromBags()

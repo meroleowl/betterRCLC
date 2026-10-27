@@ -372,9 +372,12 @@ function Queue:AddManual(text)
 	text = text or ""
 	local link = text:match("|c%x+|Hitem:.-|h%[.-%]|h|r")
 	local id = tonumber(text:match("^%s*(%d+)%s*$"))
-	if not link and id then select(2, GetItemInfo(id)) link = select(2, GetItemInfo(id)) or ("item:" .. id) end
+	if not link and id then link = select(2, GetItemInfo(id)) or ("item:" .. id) end
 	if not link then return addon:Print("That is not an item link or ID.") end
-	tinsert(addon:Pending(), {link = link, boss = "Added manually", time = time()})
+	local pending = {link = link, boss = "Added manually", time = time()}
+	tinsert(addon:Pending(), pending)
+	self.selected["p" .. pending.time .. link] = true
+	self.tab = "roll"
 	self:Update()
 	return true
 end
