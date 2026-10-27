@@ -1300,8 +1300,8 @@ function BRCVotingFrame:UpdateSide()
 	for _, r in ipairs(s.last) do if show then r:Show() else r:Hide() end end
 	if not show then for _, b in ipairs(s.wear) do b:Hide() end end
 	local canAward = show and addon.isMasterLooter and active and not lootTable[session].awarded
-	-- awarded, but the item is still in my bags (not traded yet): another player can get it without a reroll
-	local canMove = show and addon.isMasterLooter and active and lootTable[session].awarded and self.selected ~= lootTable[session].winner
+	-- Held awards can still move after council ends; only new awards require an active session.
+	local canMove = show and addon.isMasterLooter and lootTable[session].awarded and self.selected ~= lootTable[session].winner
 		and self:BagEntry(session) ~= nil
 	if canAward then s.awardAs:Show() s.award:Show() elseif canMove then s.awardAs:Hide() s.award:Show() else s.awardAs:Hide() s.award:Hide() end
 	if canAward then
