@@ -51,7 +51,7 @@ local player_relogged = true -- Determines if we potentially need data from the 
 
 function betterRCLC:OnInitialize()
 	--IDEA Consider if we want everything on self, or just whatever modules could need.
-  	self.version = "0.5.5" -- hard code the version so reload ui updates will report correct version
+  	self.version = "0.5.6" -- hard code the version so reload ui updates will report correct version
 	self.nnp = false
 	self.debug = false
 	self.tVersion = nil -- String or nil. Indicates test version, which alters stuff like version check. Is appended to 'version', i.e. "version-tVersion"

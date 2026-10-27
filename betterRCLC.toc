@@ -2,7 +2,7 @@
 ## Interface: 30300
 ## Notes: Guild loot council: RCLootCouncil + guild BiS lists. /brc
 ## Title: betterRCLC
-## Version: 0.5.5
+## Version: 0.5.6
 ## SavedVariables: betterRCLCDB, betterRCLCLootDB
 ## OptionalDeps: LibStub, CallbackHandler-1.0, Ace3, lib-st, LibWindow-1.1, LibDialog-1.0
 
