@@ -35,14 +35,6 @@ addon, with tools for raiders, council members, and the master looter.
 | **Pug tools** | Manage pug rolls and import soft reserves. |
 | **Themes** | Choose a dark colour palette or follow ElvUI. |
 
-### Added in this fork
-
-**My wins first** — a toggle in the Council item list that moves items awarded
-to you to the top. Turn it off to restore the original order.
-
-This only changes your own view; it does not affect voting or awards. The toggle
-resets when you reload the UI.
-
 ## Installation
 
 1. **Exit WoW** and [download the latest source ZIP](https://github.com/meroleowl/betterRCLC/archive/refs/heads/main.zip).
