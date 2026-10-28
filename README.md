@@ -96,9 +96,6 @@ Please [open an issue](https://github.com/meroleowl/betterRCLC/issues) with:
 - Your addon revision.
 - The exact Lua error, if one appears, and a screenshot where helpful.
 
-Remove player information or other private details before sharing logs or
-screenshots.
-
 ## Credits
 
 - **Babumbus/Valandrys** — original author of betterRCLC; this fork is based on

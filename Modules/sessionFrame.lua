@@ -86,10 +86,12 @@ function Queue:Rows()
 	end
 	local groups, order = {}, {}
 	for _, p in ipairs(addon:Pending()) do
-		local boss = p.boss or "?"
-		if not groups[boss] then groups[boss] = {time = p.time, list = {}} order[#order + 1] = boss end
-		groups[boss].time = math.max(groups[boss].time or 0, p.time or 0)
-		tinsert(groups[boss].list, {key = "p" .. (p.time or 0) .. p.link, link = p.link, time = p.time, pending = p})
+		if not addon:IsBlueDisenchantable(p.link) then
+			local boss = p.boss or "?"
+			if not groups[boss] then groups[boss] = {time = p.time, list = {}} order[#order + 1] = boss end
+			groups[boss].time = math.max(groups[boss].time or 0, p.time or 0)
+			tinsert(groups[boss].list, {key = "p" .. (p.time or 0) .. p.link, link = p.link, time = p.time, pending = p})
+		end
 	end
 	table.sort(order, function(a, b) return groups[a].time > groups[b].time end)
 	for _, boss in ipairs(order) do
@@ -374,6 +376,9 @@ function Queue:AddManual(text)
 	local id = tonumber(text:match("^%s*(%d+)%s*$"))
 	if not link and id then link = select(2, GetItemInfo(id)) or ("item:" .. id) end
 	if not link then return addon:Print("That is not an item link or ID.") end
+	if addon:IsBlueDisenchantable(link) then
+		return addon:Print("That item is blue disenchantable gear and is kept off the loot list.")
+	end
 	local pending = {link = link, boss = "Added manually", time = time()}
 	tinsert(addon:Pending(), pending)
 	self.selected["p" .. pending.time .. link] = true
@@ -422,7 +427,7 @@ function Queue:BagItems()
 	for bag = 0, NUM_BAG_SLOTS do
 		for slot = 1, GetContainerNumSlots(bag) do
 			local link = GetContainerItemLink(bag, slot)
-			local left = link and self:IsLoot(link) and self.TradeInfo(bag, slot)
+			local left = link and not addon:IsBlueDisenchantable(link) and self:IsLoot(link) and self.TradeInfo(bag, slot)
 			if left and (left ~= "boe" or (select(3, GetItemInfo(link)) or 0) >= 3) then
 				if (have[link] or 0) > 0 then have[link] = have[link] - 1
 				else out[#out + 1] = {link = link, left = left} end

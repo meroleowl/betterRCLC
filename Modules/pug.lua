@@ -75,6 +75,7 @@ end
 -- items
 ------------------------------------------------------------------------
 function P:AddItem(link, corpse, boss)
+	if addon:IsBlueDisenchantable(link) then return nil end -- blue disenchantable gear stays off every loot list
 	local list = addon.Rolls:SR(link)
 	local it = {link = link, corpse = corpse, boss = boss, time = time(), rolls = {}, sr = list and #list > 0 and list or nil}
 	tinsert(self.items, it)
@@ -97,7 +98,7 @@ function P:OnLootOpened()
 		local quality = select(4, GetLootSlotInfo(slot))
 		if link and quality and quality >= GetLootThreshold() then
 			if (have[link] or 0) > 0 then have[link] = have[link] - 1
-			else self:AddItem(link, true, boss) added = added + 1 end
+			else local it = self:AddItem(link, true, boss) if it then added = added + 1 end end
 		end
 	end
 	if added > 0 then
@@ -118,6 +119,7 @@ function P:AddFromBags(text)
 	if not link and id then link = select(2, GetItemInfo(id)) end
 	if not link then return addon:Print("That is not an item link or ID.") end
 	local it = self:AddItem(link, false, "From bags")
+	if not it then return addon:Print("That item is blue disenchantable gear and is kept off the loot list.") end
 	self:Open()
 	self:Select(it)
 	return it
