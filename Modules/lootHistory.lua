@@ -480,8 +480,8 @@ end
 --- Back into the Loot tab (ticked); the next award replaces this entry everywhere (lootBags.lua PendingAwarded).
 function LootHistory:Reroll(item)
 	if not self:CanReroll(item) then return end
-	if addon:IsBlueDisenchantable(item.e.lootWon) then
-		return addon:Print("This item is blue disenchantable gear; its existing award and delivery were left unchanged.")
+	if addon:IsFilteredGear(item.e.lootWon) then
+		return addon:Print("This item is green or blue disenchantable gear; its existing award and delivery were left unchanged.")
 	end
 	local e = item.e
 	local p = {link = e.lootWon, boss = e.boss, time = item.ts > 0 and item.ts or time(), reroll = {owner = item.name, key = Key(e)}}

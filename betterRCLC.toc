@@ -13,7 +13,7 @@ Locale\Locales.xml
 core.lua
 Data\epWeights.lua
 Data\themes.lua
-Data\blueDisenchantable.lua
+Data\disenchantableGear.lua
 ml_core.lua
 compat.lua
 Modules\Modules.xml
