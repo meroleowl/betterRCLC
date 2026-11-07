@@ -86,7 +86,7 @@ function Queue:Rows()
 	end
 	local groups, order = {}, {}
 	for _, p in ipairs(addon:Pending()) do
-		if not addon:IsFilteredGear(p.link) then
+		if not addon:IsFilteredGear(p.link, p.quality) then
 			local boss = p.boss or "?"
 			if not groups[boss] then groups[boss] = {time = p.time, list = {}} order[#order + 1] = boss end
 			groups[boss].time = math.max(groups[boss].time or 0, p.time or 0)
@@ -376,8 +376,10 @@ function Queue:AddManual(text)
 	local id = tonumber(text:match("^%s*(%d+)%s*$"))
 	if not link and id then link = select(2, GetItemInfo(id)) or ("item:" .. id) end
 	if not link then return addon:Print("That is not an item link or ID.") end
-	if addon:IsFilteredGear(link) then
-		return addon:Print("That item is green or blue disenchantable gear and is kept off the loot list.")
+	local filtered, why = addon:IsFilteredGear(link)
+	if filtered then
+		return addon:Print(why == "pending" and "That item's data is still loading; try again in a moment."
+			or "Green items, blue disenchantable gear and epic Wrath raid recipes are kept off the loot list.")
 	end
 	local pending = {link = link, boss = "Added manually", time = time()}
 	tinsert(addon:Pending(), pending)
@@ -411,10 +413,10 @@ function Queue.TradeInfo(bag, slot)
 	return (boe and not bound) and "boe" or nil
 end
 
---- Only raid loot: gear, tier tokens, recipes and Runed Orbs (no potions, food, reagents...).
+--- Only raid loot: gear, tier tokens, mapped quest rewards, recipes and Runed Orbs.
 function Queue:IsLoot(link)
 	local id = tonumber(link:match("item:(%d+)"))
-	return IsEquippableItem(link) or (id and LibToken:ItemIsToken(id)) or (self.ml and self.ml:IsMat(link)) or false
+	return IsEquippableItem(link) or (id and (LibToken:ItemIsToken(id) or addon.QUEST_REWARDS[id])) or (self.ml and self.ml:IsMat(link)) or false
 end
 
 --- Bag items the raid can still receive (IsLoot): BoEs (rare or better) and anything with a loot-trade timer,

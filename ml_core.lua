@@ -61,8 +61,6 @@ end
 -- @param pending The addon:Pending() entry when the item comes from the ML's stored loot (gives boss + loot time)
 function betterRCLCML:AddItem(item, bagged, slotIndex, index, pending)
 	addon:DebugLog("ML:AddItem", item, bagged, slotIndex, index)
-	-- Green or blue disenchantable gear never joins a session list (addon:IsFilteredGear).
-	if addon:IsFilteredGear(item) then return end
 	local name, link, rarity, ilvl, iMinLevel, type, subType, iStackCount, equipLoc, texture = GetItemInfo(item)
 
 	-- Item isn't properly loaded, so update the data in 0.5 sec (Should only happen with /brc test)
@@ -73,7 +71,10 @@ function betterRCLCML:AddItem(item, bagged, slotIndex, index, pending)
 		return
 	end
 
-	if BRCTokenTable[item] then 
+	-- Wait for item data above before deciding whether it belongs in a session.
+	if addon:IsFilteredGear(item, rarity) then return end
+
+	if BRCTokenTable[item] then
 		ilvl = BRCTokenLevel[item] 
 		equipLoc = BRCTokenTable[item]
 	end
@@ -248,12 +249,12 @@ function betterRCLCML:SessionFromBags()
 	wipe(self.lootTable)
 	local eligible = 0
 	for _, p in ipairs(pending) do
-		if not addon:IsFilteredGear(p.link) then
+		if not addon:IsFilteredGear(p.link, p.quality) then
 			self:AddItem(p.link, true, nil, nil, p)
 			eligible = eligible + 1
 		end
 	end
-	if eligible == 0 then return addon:Print("Nothing to award: the stored items are all green or blue disenchantable gear.") end
+	if eligible == 0 then return addon:Print("Nothing ready for council: stored items are excluded or their item data is still loading.") end
 	if db.autoStart then
 		if #self.lootTable == eligible then -- every eligible item is known to the client: no reason to wait
 			self:StartSession()
@@ -278,9 +279,9 @@ function betterRCLCML:LootToBags(slot, link, quality, free)
 		return false
 	end
 	if not self:LootToSelf(slot, link, quality) then return false end
-	-- Green or blue disenchantable gear is looted to my bags but never tracked as awardable loot.
-	if not addon:IsFilteredGear(link) then
-		tinsert(addon:Pending(), {link = link, boss = addon.target, time = time()})
+	-- Excluded loot is still collected, but never tracked as awardable loot.
+	if not addon:IsFilteredGear(link, quality) then
+		tinsert(addon:Pending(), {link = link, quality = quality, boss = addon.target, time = time()})
 	end
 	return true
 end
@@ -638,7 +639,7 @@ function betterRCLCML:LootOpened()
 		if stored > 0 and db.lootMode == "batch" then
 			local waiting = 0
 			for _, p in ipairs(addon:Pending()) do
-				if not addon:IsFilteredGear(p.link) then waiting = waiting + 1 end
+				if not addon:IsFilteredGear(p.link, p.quality) then waiting = waiting + 1 end
 			end
 			if waiting > 0 then
 				addon:Print(format("Stored %d item(s) in your bags, %d waiting in total. Left-click the betterRCLC minimap button, tick items and Start session.", stored, waiting))

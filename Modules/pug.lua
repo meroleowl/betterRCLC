@@ -74,8 +74,9 @@ end
 ------------------------------------------------------------------------
 -- items
 ------------------------------------------------------------------------
-function P:AddItem(link, corpse, boss)
-	if addon:IsFilteredGear(link) then return nil end -- green or blue disenchantable gear stays off every loot list
+function P:AddItem(link, corpse, boss, quality)
+	local filtered, why = addon:IsFilteredGear(link, quality)
+	if filtered then return nil, why end
 	local list = addon.Rolls:SR(link)
 	local it = {link = link, corpse = corpse, boss = boss, time = time(), rolls = {}, sr = list and #list > 0 and list or nil}
 	tinsert(self.items, it)
@@ -98,7 +99,7 @@ function P:OnLootOpened()
 		local quality = select(4, GetLootSlotInfo(slot))
 		if link and quality and quality >= GetLootThreshold() then
 			if (have[link] or 0) > 0 then have[link] = have[link] - 1
-			else local it = self:AddItem(link, true, boss) if it then added = added + 1 end end
+			else local it = self:AddItem(link, true, boss, quality) if it then added = added + 1 end end
 		end
 	end
 	if added > 0 then
@@ -118,8 +119,9 @@ function P:AddFromBags(text)
 	local id = tonumber((text or ""):match("^%s*(%d+)%s*$"))
 	if not link and id then link = select(2, GetItemInfo(id)) end
 	if not link then return addon:Print("That is not an item link or ID.") end
-	local it = self:AddItem(link, false, "From bags")
-	if not it then return addon:Print("That item is green or blue disenchantable gear and is kept off the loot list.") end
+	local it, why = self:AddItem(link, false, "From bags")
+	if not it then return addon:Print(why == "pending" and "That item's data is still loading; try again in a moment."
+		or "Green items, blue disenchantable gear and epic Wrath raid recipes are kept off the loot list.") end
 	self:Open()
 	self:Select(it)
 	return it

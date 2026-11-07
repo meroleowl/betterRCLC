@@ -481,7 +481,7 @@ end
 function LootHistory:Reroll(item)
 	if not self:CanReroll(item) then return end
 	if addon:IsFilteredGear(item.e.lootWon) then
-		return addon:Print("This item is green or blue disenchantable gear; its existing award and delivery were left unchanged.")
+		return addon:Print("This item is excluded or its data is still loading; its existing award and delivery were left unchanged.")
 	end
 	local e = item.e
 	local p = {link = e.lootWon, boss = e.boss, time = item.ts > 0 and item.ts or time(), reroll = {owner = item.name, key = Key(e)}}

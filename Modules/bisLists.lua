@@ -183,7 +183,7 @@ function BIS:ListText(key)
 	return s and s.from ~= addon.playerName and s.specs[key] or nil
 end
 
---- Where an item stands on a spec's list: nil, or {rank = n, bis = bool, slot = "Head"}. Tokens match the pieces they buy.
+--- Where an item stands on a spec's list: nil, or {rank = n, bis = bool, slot = "Head"}. Tokens/quests match their rewards.
 function BIS:Status(specKey, item)
 	if not specKey or not item then return nil end
 	local id = type(item) == "number" and item or addon:GetItemIDFromLink(item)
@@ -194,6 +194,9 @@ function BIS:Status(specKey, item)
 		for _, piece in LibToken:IterateItemsForTokenAndClass(id, specKey:match("^(%u+):")) do
 			if idx[piece] and Better(idx[piece], best) then best = idx[piece] end
 		end
+	end
+	for _, reward in ipairs(addon.QUEST_REWARDS[id] or {}) do
+		if idx[reward] and Better(idx[reward], best) then best = idx[reward] end
 	end
 	return best
 end
