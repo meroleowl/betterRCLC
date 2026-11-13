@@ -13,8 +13,51 @@ addon.RaidPanel = RP
 local SLOTS = {1, 2, 3, 15, 5, 9, 10, 6, 7, 8, 11, 12, 13, 14, 16, 17, 18}
 local ENCHANTABLE = {[1] = true, [3] = true, [15] = true, [5] = true, [9] = true, [10] = true, [7] = true, [8] = true, [16] = true}
 local SORTS = {"ilvl", "class", "name"}
-local ROW_H, ICON, STEP = 28, 20, 24
+local ROW_H, ICON, STEP = 28, 18, 21
 local DEBOUNCE, ASK_EVERY = 4, 60
+local PROFESSIONS = {2259, 2018, 7411, 4036, 2366, 45357, 25229, 2108, 2575, 8613, 3908}
+
+function RP:Professions()
+	local names, out, collapsed = {}, {}, {}
+	for _, id in ipairs(PROFESSIONS) do
+		local name = GetSpellInfo(id == 2366 and 13614 or id) -- Herb Gathering's skill line is named Herbalism.
+		if name then names[name] = id end
+	end
+	-- Collapsed skill groups hide their entries; restore the user's layout after reading.
+	self.readingSkills = true
+	local i = 1
+	while i <= GetNumSkillLines() do
+		local name, header, expanded, rank = GetSkillLineInfo(i)
+		if header and not expanded then
+			collapsed[#collapsed + 1] = i
+			ExpandSkillHeader(i)
+		elseif not header and names[name] and #out < 2 then
+			out[#out + 1] = {id = names[name], rank = rank}
+		end
+		i = i + 1
+	end
+	for n = #collapsed, 1, -1 do CollapseSkillHeader(collapsed[n]) end
+	self.readingSkills = nil
+	return out
+end
+
+local function CleanProfessions(t)
+	if type(t) ~= "table" then return end
+	local out, seen = {}, {}
+	for i = 1, 2 do
+		local p = t[i]
+		if type(p) == "table" and type(p.rank) == "number" and p.rank >= 0 and p.rank <= 600 and p.rank % 1 == 0 then
+			for _, id in ipairs(PROFESSIONS) do
+				if p.id == id and not seen[id] then
+					out[#out + 1] = {id = id, rank = p.rank}
+					seen[id] = true
+					break
+				end
+			end
+		end
+	end
+	return out
+end
 
 ------------------------------------------------------------------------
 -- my own snapshot (sent to the group)
@@ -69,7 +112,7 @@ function RP:Snapshot()
 	end
 	local ms, _, oss = addon.BIS:MySpecs()
 	return {class = addon.playerClass, ms = ms, oss = oss, gear = gear, flag = flag, ilvl = math.floor(sum / 17 * 10 + 0.5) / 10,
-		dur = lowest, ver = addon.version}
+		dur = lowest, ver = addon.version, professions = self:Professions()}
 end
 
 --- /brc raid: what this client has seen (to find out why a row stays empty).
@@ -91,6 +134,7 @@ end
 local function Key(s)
 	local t = {s.ms or "", table.concat(s.oss or {}, ","), s.ilvl, s.dur}
 	for _, slot in ipairs(SLOTS) do t[#t + 1] = s.gear[slot] or "" end
+	for _, p in ipairs(s.professions or {}) do t[#t + 1] = p.id .. ":" .. p.rank end
 	return table.concat(t, "|")
 end
 
@@ -118,8 +162,10 @@ ticker:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
 ticker:RegisterEvent("ACTIVE_TALENT_GROUP_CHANGED")
 ticker:RegisterEvent("PARTY_MEMBERS_CHANGED") -- 3.3.5 name
 ticker:RegisterEvent("RAID_ROSTER_UPDATE")
+ticker:RegisterEvent("SKILL_LINES_CHANGED")
+ticker:RegisterEvent("CHAT_MSG_SKILL")
 ticker:SetScript("OnEvent", function(_, event)
-	if not addon.db then return end
+	if not addon.db or RP.readingSkills then return end
 	if event == "PARTY_MEMBERS_CHANGED" or event == "RAID_ROSTER_UPDATE" then
 		local grouped = addon:InAnyGroup() and true or false
 		if grouped == RP.wasGrouped then return end -- only when I join / leave, not on every roster tick
@@ -166,7 +212,8 @@ function RP:Receive(sender, d)
 	local oss = {}
 	for _, k in ipairs(type(d.oss) == "table" and d.oss or {}) do if type(k) == "string" then oss[#oss + 1] = k end end
 	self.roster[name] = {class = type(d.class) == "string" and d.class or nil, ms = type(d.ms) == "string" and d.ms or nil, oss = oss,
-		gear = CleanGear(d.gear), flag = flag, ilvl = tonumber(d.ilvl) or 0, dur = tonumber(d.dur), ver = d.ver, ts = time()}
+		gear = CleanGear(d.gear), flag = flag, ilvl = tonumber(d.ilvl) or 0, dur = tonumber(d.dur), ver = d.ver, ts = time(),
+		professions = CleanProfessions(d.professions)}
 	if self.frame and self.frame:IsVisible() then self:Update() end
 end
 
@@ -261,7 +308,7 @@ end
 ------------------------------------------------------------------------
 -- UI
 ------------------------------------------------------------------------
-local X_SPEC, X_ILVL, X_ISSUE, X_VER, X_ICONS = 140, 330, 372, 480, 545
+local X_SPEC, X_ILVL, X_ISSUE, X_VER, X_PROF, X_ICONS = 140, 282, 324, 420, 480, 590
 
 function RP:MakeRow(list)
 	local r = CreateFrame("Frame", nil, list)
@@ -269,12 +316,16 @@ function RP:MakeRow(list)
 	r.name:SetPoint("LEFT", 10, 0)
 	r.spec = UI:Text(r, 11, "ink2")
 	r.spec:SetPoint("LEFT", X_SPEC, 0)
+	r.spec:SetWidth(X_ILVL - X_SPEC - 6)
+	r.spec:SetHeight(18)
 	r.ilvl = UI:Text(r, 12, "ink")
 	r.ilvl:SetPoint("LEFT", X_ILVL, 0)
 	r.issue = UI:Text(r, 11, "ink2")
 	r.issue:SetPoint("LEFT", X_ISSUE, 0)
 	r.ver = UI:Text(r, 11, "ink2")
 	r.ver:SetPoint("LEFT", X_VER, 0)
+	r.professions = UI:Text(r, 11, "ink2")
+	r.professions:SetPoint("LEFT", X_PROF, 0)
 	r.icons = {}
 	for i = 1, #SLOTS do
 		local b = UI:Icon(r, ICON)
@@ -289,6 +340,12 @@ end
 function RP:FillRow(r, m)
 	local d = m.d
 	r.name:SetText(UI:ClassName(m.name, m.class))
+	local professions = {}
+	for _, p in ipairs(d and d.professions or {}) do
+		local _, _, icon = GetSpellInfo(p.id)
+		professions[#professions + 1] = "|T" .. (icon or "Interface\\Icons\\INV_Misc_QuestionMark") .. ":16|t " .. p.rank
+	end
+	r.professions:SetText(#professions > 0 and table.concat(professions, "  ") or "-")
 	if not d then
 		r.spec:SetText("|cff6f6a62no betterRCLC data|r")
 		r.ilvl:SetText("")
@@ -358,6 +415,7 @@ end
 function RP:CSV()
 	local head = {"player", "class", "main_spec", "off_specs", "ilvl", "missing_enchants", "empty_sockets", "lowest_durability", "addon_version"}
 	for _, slot in ipairs(SLOTS) do head[#head + 1] = SLOT_NAMES[slot] end
+	head[#head + 1] = "professions"
 	local out, rows = {table.concat(head, ",")}, self:Rows()
 	for _, m in ipairs(rows) do
 		local d = m.d
@@ -376,6 +434,9 @@ function RP:CSV()
 				local s = d.gear[slot]
 				f[#f + 1] = s and ((GetItemInfo("item:" .. s)) or s:match("^(%d+)")) or ""
 			end
+			local professions = {}
+			for _, p in ipairs(d.professions or {}) do professions[#professions + 1] = (GetSpellInfo(p.id == 2366 and 13614 or p.id) or p.id) .. " " .. p.rank end
+			f[#f + 1] = table.concat(professions, "; ")
 		end
 		for i = 1, #f do f[i] = csv(f[i]) end
 		out[#out + 1] = table.concat(f, ",")
@@ -424,7 +485,7 @@ function RP:GetFrame()
 	cols:SetPoint("TOPLEFT", 0, -44)
 	cols:SetPoint("TOPRIGHT", 0, -44)
 	cols:SetHeight(18)
-	for _, c in ipairs({{"Player", 10}, {"Specs (main, off)", X_SPEC}, {"ilvl", X_ILVL}, {"Problems", X_ISSUE}, {"Addon", X_VER}, {"Gear", X_ICONS}}) do
+	for _, c in ipairs({{"Player", 10}, {"Specs (main, off)", X_SPEC}, {"ilvl", X_ILVL}, {"Problems", X_ISSUE}, {"Addon", X_VER}, {"Professions", X_PROF}, {"Gear", X_ICONS}}) do
 		local t = UI:Text(cols, 11, "ink3")
 		t:SetPoint("LEFT", c[2], 0)
 		t:SetText(c[1])
