@@ -810,12 +810,16 @@ end
 -- Stable partition keeps both groups in their original order, including duplicate items.
 function BRCVotingFrame:BuildItemRows()
 	local rows, rest = {}, {}
+	local search = (self.itemSearch or ""):lower()
 	for ses, item in ipairs(lootTable) do
-		local row = {ses = ses, item = item}
-		if self.myWinsFirst and item.awarded and item.winner == addon.playerName then
-			rows[#rows + 1] = row
-		else
-			rest[#rest + 1] = row
+		local name = item.name or (item.link and item.link:match("%[(.-)%]")) or (item.link and GetItemInfo(item.link)) or ""
+		if search == "" or name:lower():find(search, 1, true) then
+			local row = {ses = ses, item = item}
+			if self.myWinsFirst and item.awarded and item.winner == addon.playerName then
+				rows[#rows + 1] = row
+			else
+				rest[#rest + 1] = row
+			end
 		end
 	end
 	for _, row in ipairs(rest) do rows[#rows + 1] = row end
@@ -851,6 +855,13 @@ function BRCVotingFrame:GetFrame()
 	end)
 	f.myWins:SetPoint("TOPLEFT", 10, -26)
 	f.myWins.tip = {"My wins first", "Show items awarded to you at the top. Click again for the original order. Only changes your view; resets on reload."}
+	f.search = UI:Edit(f.rail, 186, 22, false, "Search items...")
+	f.search:SetPoint("TOPLEFT", 10, -54)
+	f.search.onChange = function(text)
+		self.itemSearch = text
+		f.items.offset = 0
+		f.items:SetData(self:BuildItemRows())
+	end
 	f.items = UI:List(f.rail, 44, function(list)
 		local r = CreateFrame("Button", nil, list)
 		UI:Panel(r, "bg2", false, 1)
@@ -905,7 +916,7 @@ function BRCVotingFrame:GetFrame()
 		local c = (r.ready and not item.awarded and not on) and p.ok or p.accent -- green edge: every answer is in
 		r.mark:SetVertexColor(c[1], c[2], c[3], (on or (r.ready and not item.awarded)) and 1 or 0)
 	end)
-	f.items:SetPoint("TOPLEFT", f.rail, "TOPLEFT", 1, -54)
+	f.items:SetPoint("TOPLEFT", f.rail, "TOPLEFT", 1, -82)
 	f.items:SetPoint("BOTTOMRIGHT", f.rail, "BOTTOMRIGHT", -1, 1)
 
 	-- side panel (selected player)
