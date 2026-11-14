@@ -402,6 +402,7 @@ end
 --- Loot priority of a candidate on the current item, lower = first:
 -- 1 MS + BiS (or an alt marked equal) for their main spec, 2 MS + listed alt, 3 MS, 4 Upgrade roll,
 -- 5 OS + BiS for their off spec, 6 OS, then other buttons, then statuses (pass/autopass/waiting/blocked).
+-- Marked players' MS / Upgrade / OS answers share a later group (tiers 90 / 91 / 92).
 -- What a button counts as: addon:ButtonKind (the three fixed buttons in core.lua).
 -- Returns tier, label, color.
 function BRCVotingFrame:GetPriority(name)
@@ -445,6 +446,9 @@ function BRCVotingFrame:GetPriority(name)
 	else
 		tier = 100 + (addon:GetResponseSort(r) or 0)
 	end
+	if addon.mldb.lowPriority and addon.mldb.lowPriority[name] == true and (kind == "ms" or kind == "up" or kind == "os") then
+		tier = kind == "ms" and 90 or kind == "up" and 91 or 92
+	end
 	return tier, label, color
 end
 
@@ -457,6 +461,7 @@ local GROUPS = {
 	{key = "up", name = "Upgrade", tiers = {[4] = true}},
 	{key = "os", name = "OS", tiers = {[5] = true, [6] = true}},
 	{key = "other", name = "Other", optional = true}, -- 7..99: extra ML buttons
+	{key = "low", name = "Low priority", tiers = {[90] = true, [91] = true, [92] = true}, optional = true},
 	{key = "pass", name = "Pass", statuses = {PASS = true, AUTOPASS = true, REMOVED = true, BLOCKED = true}},
 	{key = "wait", name = "Waiting", optional = true, statuses = {ANNOUNCED = true, WAIT = true, NOTHING = true}},
 }
@@ -467,7 +472,7 @@ local function GroupOf(tier, response)
 		if g.tiers and g.tiers[tier] then return i end
 		if g.statuses and g.statuses[response] then return i end
 	end
-	return tier < 100 and 5 or 6
+	return tier < 100 and 5 or 7
 end
 
 --- Main-spec items a player won in the last 7 days (the "+1" tie-break; local loot history, award reasons not counted).
@@ -1033,6 +1038,10 @@ function BRCVotingFrame:MakeRow(list)
 	r.cells[1]:ClearAllPoints()
 	r.cells[1]:SetPoint("LEFT", self.COLS[1][2] + 20, 0)
 	r.cells[1]:SetWidth(76)
+	r.priorityDot = UI:Text(r, 16, "ink")
+	r.priorityDot:SetPoint("RIGHT", r, "LEFT", self.COLS[2][2] - 4, 0)
+	r.priorityDot:SetWidth(8)
+	r.priorityDot:SetHeight(16)
 	r.cells[2]:SetWidth(104)
 	r.cells[4]:SetWidth(46) -- Upgrade: never into the Won column (at the 1000 px minimum: 296 + 46 < row - 178)
 	r.wear = UI:Icon(r, 18)
@@ -1093,6 +1102,8 @@ end
 
 function BRCVotingFrame:FillRow(r, item)
 	r.item = item
+	r.priorityDot:Hide()
+	r.cells[1]:SetWidth(76)
 	local isRow = item.name ~= nil
 	for _, t in ipairs(r.cells) do t:SetText("") if isRow then t:Show() else t:Hide() end end
 	r.wear:Hide() r.note:Hide() r.vote:Hide() r.spec:Hide()
@@ -1112,6 +1123,11 @@ function BRCVotingFrame:FillRow(r, item)
 		UI:SetSpecIcon(r.spec, c.ms or (cached and cached[1]), c.class)
 		r.cells[1]:SetText(item.name)
 		UI:Recolor(r.cells[1], ClassColor(c.class))
+		if item.tier == 90 or item.tier == 91 or item.tier == 92 then
+			r.cells[1]:SetWidth(64)
+			r.priorityDot:SetText(addon:AnswerText(c.response, "•"))
+			r.priorityDot:Show()
+		end
 		r.cells[2]:SetText((item.notBis and "|cffe2b84dnot BiS|r " or "") .. (item.label ~= "" and item.label or "not listed"))
 		UI:Recolor(r.cells[2], item.label ~= "" and {item.color[1], item.color[2], item.color[3]} or "ink3")
 		if c.gear1 then r.wear:SetItem(c.gear1) r.wear:Show() end

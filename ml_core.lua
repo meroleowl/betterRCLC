@@ -408,6 +408,7 @@ function betterRCLCML:BuildMLdb()
 		chatRolls		= db.chatRolls, -- answers roll with /roll in chat (off: the loot master's addon rolls, no chat)
 		councilVotes	= db.councilVotes,
 		blocked			= db.blocked, -- [name] = reason
+		lowPriority		= db.lowPriority or {},
 	}
 end
 

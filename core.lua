@@ -51,7 +51,7 @@ local player_relogged = true -- Determines if we potentially need data from the 
 
 function betterRCLC:OnInitialize()
 	--IDEA Consider if we want everything on self, or just whatever modules could need.
-	self.version = "0.5.8" -- hard code the version so reload ui updates will report correct version
+	self.version = "0.5.9" -- hard code the version so reload ui updates will report correct version
 	self.nnp = false
 	self.debug = false
 	self.tVersion = nil -- String or nil. Indicates test version, which alters stuff like version check. Is appended to 'version', i.e. "version-tVersion"
@@ -185,6 +185,7 @@ function betterRCLC:OnInitialize()
 			forceBis = false, -- ML: raiders use my BiS lists instead of their own (only while in my group)
 			upgradeMode = "ep", -- what the council's Upgrade column shows: "ep" | "ilvl"
 			blocked = {}, -- [name] = reason: players the officers blocked from rolling (sent to the raid in mldb)
+			lowPriority = {}, -- [name] = true: considered after normal MS / Upgrade / OS rolls
 			sendHistory = true,
 
 			minRank = -1,
@@ -777,6 +778,9 @@ function betterRCLC:OnCommReceived(prefix, serializedMsg, distri, sender)
 					self.mldb = unpack(data)
 					self.BIS:CheckSync(self.mldb, sender)
 					self.BIS:SendMine() -- my specs reach the loot master before the first roll
+					if self.RaidPanel then self.RaidPanel:Update() end
+					local vf = self:GetModule("BRCVotingFrame", true)
+					if vf then vf:Update() end
 				else
 					self:Debug("Non-ML:", sender, "sent Mldb!")
 				end
@@ -1401,6 +1405,15 @@ function betterRCLC:NewMLCheck()
 	if self:UnitIsUnit(old_ml, "player") and not self.isMasterLooter then
 		-- We were ML, but no longer, so disable masterlooter module
 		self:GetActiveModule("masterlooter"):Disable()
+	end
+	if old_ml ~= self.masterLooter then
+		if self.mldb then self.mldb.lowPriority = nil end -- discard the old master's flags, not their saved profile
+		if self.RaidPanel then self.RaidPanel:Update() end
+		local vf = self:GetModule("BRCVotingFrame", true)
+		if vf then vf:Update() end
+		if not self.isMasterLooter and self.masterLooter then
+			self:SendCommand(self.masterLooter, "MLdb_request")
+		end
 	end
 	if self:UnitIsUnit(old_ml, self.masterLooter) or db.usage.never then return end -- no change
 	if not self.isMasterLooter and self.masterLooter then return end -- Someone else is ML

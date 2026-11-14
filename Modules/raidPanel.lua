@@ -310,10 +310,27 @@ end
 ------------------------------------------------------------------------
 local X_SPEC, X_ILVL, X_ISSUE, X_VER, X_PROF, X_ICONS = 140, 282, 324, 420, 480, 590
 
+function RP:SetLowPriority(name, on)
+	if not addon.isMasterLooter or type(name) ~= "string" or name == "" then return end
+	local ml = addon:GetActiveModule("masterlooter")
+	if not ml then return end
+	local p = addon.db.profile
+	p.lowPriority = p.lowPriority or {}
+	p.lowPriority[name] = on and true or nil
+	ml:UpdateMLdb()
+	self:Update()
+	local vf = addon:GetModule("BRCVotingFrame", true)
+	if vf then vf:Update() end
+end
+
 function RP:MakeRow(list)
 	local r = CreateFrame("Frame", nil, list)
+	r.lowPriority = UI:Check(r, "", function(on) self:SetLowPriority(r.member, on) end)
+	r.lowPriority:SetPoint("LEFT", 10, 0)
 	r.name = UI:Text(r, 12, "ink")
-	r.name:SetPoint("LEFT", 10, 0)
+	r.name:SetPoint("LEFT", 34, 0)
+	r.name:SetWidth(X_SPEC - 40)
+	r.name:SetHeight(18)
 	r.spec = UI:Text(r, 11, "ink2")
 	r.spec:SetPoint("LEFT", X_SPEC, 0)
 	r.spec:SetWidth(X_ILVL - X_SPEC - 6)
@@ -339,6 +356,10 @@ end
 
 function RP:FillRow(r, m)
 	local d = m.d
+	r.member = m.name
+	local settings = addon.isMasterLooter and addon.db.profile or addon.mldb
+	r.lowPriority:SetChecked(settings and settings.lowPriority and settings.lowPriority[m.name] == true)
+	if addon.isMasterLooter then r.lowPriority:Enable() else r.lowPriority:Disable() end
 	r.name:SetText(UI:ClassName(m.name, m.class))
 	local professions = {}
 	for _, p in ipairs(d and d.professions or {}) do
@@ -485,7 +506,7 @@ function RP:GetFrame()
 	cols:SetPoint("TOPLEFT", 0, -44)
 	cols:SetPoint("TOPRIGHT", 0, -44)
 	cols:SetHeight(18)
-	for _, c in ipairs({{"Player", 10}, {"Specs (main, off)", X_SPEC}, {"ilvl", X_ILVL}, {"Problems", X_ISSUE}, {"Addon", X_VER}, {"Professions", X_PROF}, {"Gear", X_ICONS}}) do
+	for _, c in ipairs({{"Low", 10}, {"Player", 34}, {"Specs (main, off)", X_SPEC}, {"ilvl", X_ILVL}, {"Problems", X_ISSUE}, {"Addon", X_VER}, {"Professions", X_PROF}, {"Gear", X_ICONS}}) do
 		local t = UI:Text(cols, 11, "ink3")
 		t:SetPoint("LEFT", c[2], 0)
 		t:SetText(c[1])
