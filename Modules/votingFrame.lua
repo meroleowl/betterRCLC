@@ -807,7 +807,7 @@ local function RollText(c, name)
 end
 
 --- Display order only: never reorder lootTable, whose indices are the comms/session IDs.
--- Stable partition keeps both groups in their original order, including duplicate items.
+-- My wins stay first; optional ilvl sorting keeps ties in original session order.
 function BRCVotingFrame:BuildItemRows()
 	local rows, rest = {}, {}
 	local search = (self.itemSearch or ""):lower()
@@ -821,6 +821,15 @@ function BRCVotingFrame:BuildItemRows()
 				rest[#rest + 1] = row
 			end
 		end
+	end
+	if self.sortByIlvl then
+		local function higherIlvl(a, b)
+			local x, y = a.item.ilvl or 0, b.item.ilvl or 0
+			if x ~= y then return x > y end
+			return a.ses < b.ses
+		end
+		table.sort(rows, higherIlvl)
+		table.sort(rest, higherIlvl)
 	end
 	for _, row in ipairs(rest) do rows[#rows + 1] = row end
 	return rows
@@ -846,15 +855,24 @@ function BRCVotingFrame:GetFrame()
 	f.railTitle = UI:Text(f.rail, 11, "ink3")
 	f.railTitle:SetPoint("TOPLEFT", 10, -8)
 	f.railTitle:SetText("ITEMS")
-	f.myWins = UI:Button(f.rail, "My wins first: Off", 186, 22, "default", function()
+	f.myWins = UI:Button(f.rail, "My wins first", 90, 22, "default", function()
 		self.myWinsFirst = not self.myWinsFirst
 		f.myWins:SetActive(self.myWinsFirst)
-		f.myWins:SetLabel(self.myWinsFirst and "My wins first: On" or "My wins first: Off")
 		f.items.offset = 0
-		self:Update()
+		f.items:SetData(self:BuildItemRows())
 	end)
+	f.myWins:SetActive(self.myWinsFirst)
 	f.myWins:SetPoint("TOPLEFT", 10, -26)
-	f.myWins.tip = {"My wins first", "Show items awarded to you at the top. Click again for the original order. Only changes your view; resets on reload."}
+	f.myWins.tip = {"My wins first", "Keep items awarded to you above other items. Item-level sorting still applies within each group. Only changes your view; resets on reload."}
+	f.sortIlvl = UI:Button(f.rail, "Sort by ilvl", 90, 22, "default", function()
+		self.sortByIlvl = not self.sortByIlvl
+		f.sortIlvl:SetActive(self.sortByIlvl)
+		f.items.offset = 0
+		f.items:SetData(self:BuildItemRows())
+	end)
+	f.sortIlvl:SetActive(self.sortByIlvl)
+	f.sortIlvl:SetPoint("LEFT", f.myWins, "RIGHT", 6, 0)
+	f.sortIlvl.tip = {"Sort by ilvl", "Highest item level first, with My wins first taking priority. Toggle off for the original order. Only changes your view; resets on reload."}
 	f.search = UI:Edit(f.rail, 186, 22, false, "Search items...")
 	f.search:SetPoint("TOPLEFT", 10, -54)
 	f.search.onChange = function(text)
