@@ -6,14 +6,14 @@
 
 local addon = LibStub("AceAddon-3.0"):GetAddon("betterRCLC")
 local UI = addon.UI
-local RP = {roster = {}, filter = {issues = false}, sort = "ilvl"}
+local RP = {roster = {}, patchY = {}, filter = {issues = false}, sort = "ilvl"}
 addon.RaidPanel = RP
 
 -- wowsims order: left column, right column, weapons
 local SLOTS = {1, 2, 3, 15, 5, 9, 10, 6, 7, 8, 11, 12, 13, 14, 16, 17, 18}
 local ENCHANTABLE = {[1] = true, [3] = true, [15] = true, [5] = true, [9] = true, [10] = true, [7] = true, [8] = true, [16] = true}
 local SORTS = {"ilvl", "class", "name"}
-local ROW_H, ICON, STEP = 28, 18, 21
+local ROW_H, ICON, STEP = 28, 18, 19
 local DEBOUNCE, ASK_EVERY = 4, 60
 local PROFESSIONS = {2259, 2018, 7411, 4036, 2366, 45357, 25229, 2108, 2575, 8613, 3908}
 
@@ -167,6 +167,7 @@ ticker:RegisterEvent("CHAT_MSG_SKILL")
 ticker:SetScript("OnEvent", function(_, event)
 	if not addon.db or RP.readingSkills then return end
 	if event == "PARTY_MEMBERS_CHANGED" or event == "RAID_ROSTER_UPDATE" then
+		if RP.frame and RP.frame:IsVisible() then RP:Update() end
 		local grouped = addon:InAnyGroup() and true or false
 		if grouped == RP.wasGrouped then return end -- only when I join / leave, not on every roster tick
 		RP.wasGrouped = grouped
@@ -189,6 +190,27 @@ local function InGroup(name)
 	return false
 end
 RP.InGroup = InGroup
+
+function RP:CheckPatchY()
+	self.patchY = {}
+	if IsAddOnLoaded("!PYAndre") then self.patchY[addon.playerName] = true end
+	-- Use the MPQ addon's own protocol; other players do not need betterRCLC.
+	if GetNumRaidMembers() > 0 then SendAddonMessage("PCHY_A", "REQ", "RAID")
+	elseif GetNumPartyMembers() > 0 then SendAddonMessage("PCHY_A", "REQ", "PARTY") end
+	if self.frame and self.frame:IsVisible() then self:Update() end
+end
+
+function RP:ReceivePatchY(prefix, msg, sender)
+	if prefix ~= "PCHY_A" or type(msg) ~= "string" or not msg:match("^VER:.+") or type(sender) ~= "string" then return end
+	local name = sender:gsub("%-.*", "")
+	if not InGroup(name) then return end
+	self.patchY[name] = true
+	if self.frame and self.frame:IsVisible() then self:Update() end
+end
+
+local patchYComm = CreateFrame("Frame")
+patchYComm:RegisterEvent("CHAT_MSG_ADDON")
+patchYComm:SetScript("OnEvent", function(_, _, prefix, msg, channel, sender) RP:ReceivePatchY(prefix, msg, sender) end)
 
 local function CleanGear(t)
 	local out = {}
@@ -236,23 +258,24 @@ end
 ------------------------------------------------------------------------
 function RP:Members()
 	local out = {}
-	local function add(name, class)
+	local function add(name, class, unit)
 		if not name then return end
-		out[#out + 1] = {name = name, class = class, d = self.roster[name]}
+		local offline = unit ~= "player" and not UnitIsConnected(unit)
+		out[#out + 1] = {name = name, class = class, d = self.roster[name], offline = offline, patchY = self.patchY[name] == true and not offline}
 	end
 	if GetNumRaidMembers and GetNumRaidMembers() > 0 then
 		for i = 1, GetNumRaidMembers() do
 			local name, _, _, _, _, class = GetRaidRosterInfo(i)
-			add(name and name:gsub("%-.*", ""), class)
+			add(name and name:gsub("%-.*", ""), class, "raid" .. i)
 		end
 	elseif GetNumPartyMembers and GetNumPartyMembers() > 0 then
-		add(addon.playerName, addon.playerClass)
+		add(addon.playerName, addon.playerClass, "player")
 		for i = 1, GetNumPartyMembers() do
 			local _, class = UnitClass("party" .. i)
-			add(UnitName("party" .. i), class)
+			add(UnitName("party" .. i), class, "party" .. i)
 		end
 	else
-		add(addon.playerName, addon.playerClass)
+		add(addon.playerName, addon.playerClass, "player")
 	end
 	for _, m in ipairs(out) do m.class = (m.d and m.d.class) or m.class end
 	return out
@@ -308,7 +331,7 @@ end
 ------------------------------------------------------------------------
 -- UI
 ------------------------------------------------------------------------
-local X_SPEC, X_ILVL, X_ISSUE, X_VER, X_PROF, X_ICONS = 140, 282, 324, 420, 480, 590
+local X_SPEC, X_ILVL, X_ISSUE, X_VER, X_PATCHY, X_PROF, X_ICONS = 140, 282, 324, 420, 480, 526, 636
 
 function RP:SetLowPriority(name, on)
 	if not addon.isMasterLooter or type(name) ~= "string" or name == "" then return end
@@ -341,6 +364,8 @@ function RP:MakeRow(list)
 	r.issue:SetPoint("LEFT", X_ISSUE, 0)
 	r.ver = UI:Text(r, 11, "ink2")
 	r.ver:SetPoint("LEFT", X_VER, 0)
+	r.patchY = UI:Text(r, 11, "ink2")
+	r.patchY:SetPoint("LEFT", X_PATCHY, 0)
 	r.professions = UI:Text(r, 11, "ink2")
 	r.professions:SetPoint("LEFT", X_PROF, 0)
 	r.icons = {}
@@ -361,6 +386,7 @@ function RP:FillRow(r, m)
 	r.lowPriority:SetChecked(settings and settings.lowPriority and settings.lowPriority[m.name] == true)
 	if addon.isMasterLooter then r.lowPriority:Enable() else r.lowPriority:Disable() end
 	r.name:SetText(UI:ClassName(m.name, m.class))
+	r.patchY:SetText(m.offline and "|cff6f6a62Offline|r" or m.patchY and "|cff57c27aYes|r" or "|cffd9534fNo|r")
 	local professions = {}
 	for _, p in ipairs(d and d.professions or {}) do
 		local _, _, icon = GetSpellInfo(p.id)
@@ -437,6 +463,7 @@ function RP:CSV()
 	local head = {"player", "class", "main_spec", "off_specs", "ilvl", "missing_enchants", "empty_sockets", "lowest_durability", "addon_version"}
 	for _, slot in ipairs(SLOTS) do head[#head + 1] = SLOT_NAMES[slot] end
 	head[#head + 1] = "professions"
+	head[#head + 1] = "patch_y"
 	local out, rows = {table.concat(head, ",")}, self:Rows()
 	for _, m in ipairs(rows) do
 		local d = m.d
@@ -459,6 +486,8 @@ function RP:CSV()
 			for _, p in ipairs(d.professions or {}) do professions[#professions + 1] = (GetSpellInfo(p.id == 2366 and 13614 or p.id) or p.id) .. " " .. p.rank end
 			f[#f + 1] = table.concat(professions, "; ")
 		end
+		for i = #f + 1, #head - 1 do f[i] = "" end
+		f[#head] = m.offline and "Offline" or m.patchY and "Yes" or "No"
 		for i = 1, #f do f[i] = csv(f[i]) end
 		out[#out + 1] = table.concat(f, ",")
 	end
@@ -496,7 +525,7 @@ function RP:GetFrame()
 	f.issuesBtn = UI:Button(f, "Problems only", nil, 22, "default", function() self.filter.issues = not self.filter.issues self:Update() end)
 	f.issuesBtn:SetPoint("LEFT", f.sortBtn, "RIGHT", 6, 0)
 	f.issuesBtn.tip = {"Problems only", "Missing enchants, empty sockets, durability under 30%, or an older addon version. Rings and off-hands are not checked for enchants."}
-	f.refresh = UI:Button(f, "Refresh", nil, 22, "default", function() RP:SendMine() RP:Ask(true) end)
+	f.refresh = UI:Button(f, "Refresh", nil, 22, "default", function() RP:CheckPatchY() RP:SendMine() RP:Ask(true) end)
 	f.refresh:SetPoint("TOPRIGHT", -12, -12)
 	f.export = UI:Button(f, "Export CSV", nil, 22, "default", function() RP:ShowExport() end)
 	f.export:SetPoint("RIGHT", f.refresh, "LEFT", -6, 0)
@@ -506,7 +535,7 @@ function RP:GetFrame()
 	cols:SetPoint("TOPLEFT", 0, -44)
 	cols:SetPoint("TOPRIGHT", 0, -44)
 	cols:SetHeight(18)
-	for _, c in ipairs({{"Low", 10}, {"Player", 34}, {"Specs (main, off)", X_SPEC}, {"ilvl", X_ILVL}, {"Problems", X_ISSUE}, {"Addon", X_VER}, {"Professions", X_PROF}, {"Gear", X_ICONS}}) do
+	for _, c in ipairs({{"Low", 10}, {"Player", 34}, {"Specs (main, off)", X_SPEC}, {"ilvl", X_ILVL}, {"Problems", X_ISSUE}, {"Addon", X_VER}, {"PatchY", X_PATCHY}, {"Professions", X_PROF}, {"Gear", X_ICONS}}) do
 		local t = UI:Text(cols, 11, "ink3")
 		t:SetPoint("LEFT", c[2], 0)
 		t:SetText(c[1])
@@ -520,6 +549,7 @@ end
 
 addon.Main.onShow.raid = function()
 	RP:GetFrame()
+	RP:CheckPatchY()
 	RP:SendMine() -- my own row is always current
 	RP:Ask()
 	RP:Update()
