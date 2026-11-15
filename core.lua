@@ -788,7 +788,7 @@ function betterRCLC:OnCommReceived(prefix, serializedMsg, distri, sender)
 			elseif command == "verTest" and not self:UnitIsUnit(sender, "player") then -- Don't reply to our own verTests
 				local otherVersion, tVersion = unpack(data)
 				self:SendCommand(sender, "verTestReply", self.playerName, self.playerClass, self.guildRank, self.version, self.tVersion)
-				if self.version < otherVersion and not self.verCheckDisplayed and (not (tVersion or self.tVersion)) then
+				if self.RaidPanel.CmpVer(self.version, otherVersion) < 0 and not self.verCheckDisplayed and (not (tVersion or self.tVersion)) then
 					self:Print(format(L["version_outdated_msg"], self.version, otherVersion))
 					self.verCheckDisplayed = true
 
@@ -799,7 +799,7 @@ function betterRCLC:OnCommReceived(prefix, serializedMsg, distri, sender)
 
 			elseif command == "verTestReply" then
 				local _,_,_, otherVersion, tVersion = unpack(data)
-				if self.version < otherVersion and not self.verCheckDisplayed and (not (tVersion or self.tVersion)) then
+				if self.RaidPanel.CmpVer(self.version, otherVersion) < 0 and not self.verCheckDisplayed and (not (tVersion or self.tVersion)) then
 					self:Print(format(L["version_outdated_msg"], self.version, otherVersion))
 					self.verCheckDisplayed = true
 
